@@ -1,0 +1,85 @@
+{
+  "project_info": {
+    "project_number": "595318465687",
+    "firebase_url": "https://health-scope-21900-default-rtdb.firebaseio.com",
+    "project_id": "health-scope-21900",
+    "storage_bucket": "health-scope-21900.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:595318465687:android:b8ffcefd6561385fa7f5d2",
+        "android_client_info": {
+          "package_name": "com.example.healthscope"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "595318465687-c97tcdr3m7k3ha1iod0vacbuj4aghe2a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.healthscope",
+            "certificate_hash": "b5cd6ab57b1bba4708683d56a71e6f047744a6b4"
+          }
+        },
+        {
+          "client_id": "595318465687-to8oj0nevkvlap6s5n8e0vl6ghcghnqv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6MoDEuhUqEEV7gcv2VC1h59nxXR4Aul8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "595318465687-to8oj0nevkvlap6s5n8e0vl6ghcghnqv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:595318465687:android:b4cf7953953f1756a7f5d2",
+        "android_client_info": {
+          "package_name": "com.healthscope.healthscopeapplication"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "595318465687-bfo7he51rqpqf0ki7a2fldl0b2kvqtrc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.healthscope.healthscopeapplication",
+            "certificate_hash": "b5cd6ab57b1bba4708683d56a71e6f047744a6b4"
+          }
+        },
+        {
+          "client_id": "595318465687-to8oj0nevkvlap6s5n8e0vl6ghcghnqv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6MoDEuhUqEEV7gcv2VC1h59nxXR4Aul8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "595318465687-to8oj0nevkvlap6s5n8e0vl6ghcghnqv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
