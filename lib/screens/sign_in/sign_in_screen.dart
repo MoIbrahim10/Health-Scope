@@ -57,9 +57,9 @@ class Body extends StatelessWidget {
                 ),
                 SizedBox(height: SizeConfig.screenHeight * 0.04),
                 SignForm(),
-                SizedBox(height: SizeConfig.screenHeight * 0.02),
+                SizedBox(height: SizeConfig.screenHeight * 0.05),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     SocalCard(
                       icon: "assets/icons/google-icon.svg",
@@ -75,7 +75,7 @@ class Body extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: getProportionateScreenHeight(20)),
+                SizedBox(height: getProportionateScreenHeight(30)),
                 NoAccountText(),
               ],
             ),
