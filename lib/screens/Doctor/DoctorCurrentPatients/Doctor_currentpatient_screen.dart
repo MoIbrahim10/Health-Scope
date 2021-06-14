@@ -399,7 +399,7 @@ class Bodyyy extends StatelessWidget {
               ),
             ),
             MedicalHistoryy(history: pPatient),
-            SizedBox(height: 32),
+            SizedBox(height: getProportionateScreenHeight(100)),
             GestureDetector(
               onTap: () => Navigator.push(
                   context,
@@ -423,7 +423,7 @@ class Bodyyy extends StatelessWidget {
                   ),
                   margin: EdgeInsets.only(top: 10),
                   width: double.infinity,
-                  height: 50,
+                  height: getProportionateScreenHeight(50),
                 ),
               ),
             ),

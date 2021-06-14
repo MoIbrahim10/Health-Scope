@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:healthscope/components/Patient%20_bottom_nav_bar.dart';
 import 'package:healthscope/enums.dart';
-
 import 'package:flutter/cupertino.dart';
 import 'package:healthscope/size_config.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_database/ui/firebase_animated_list.dart';
@@ -54,23 +52,28 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
             height: size.height,
             child: Column(children: [
               Flexible(
-                child: new FirebaseAnimatedList(
+                child: FirebaseAnimatedList(
                     shrinkWrap: true,
                     query: ref,
                     itemBuilder: (BuildContext context, DataSnapshot snapshot,
                         Animation<double> animation, int index) {
-                      var spo2 = snapshot.value['spo2']['dg'];
+                      var spo2 = snapshot.value['spo2']['val'];
+                      var bg = snapshot.value['Bloodglucose']['val'];
+                      var bp = snapshot.value['Bloodpressure']['val'];
+                      var hr = snapshot.value['Heartrate']['val'];
+                      var temperature = snapshot.value['Temperature']['val'];
+                      var weight = snapshot.value['Weight']['val'];
 
                       print(snapshot.value);
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        // mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: <Widget>[
                           Text(
                             'Hello, Casey',
                             style: TextStyle(
-                              // fontFamily: 'Muli',
-                              fontSize: 30.0,
+                              fontFamily: 'Muli',
+                              fontSize: 50.0,
                               fontWeight: FontWeight.bold,
                               color: Color(0XFFEB1555),
                             ),
@@ -106,7 +109,8 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                                         textBaseline: TextBaseline.alphabetic,
                                         children: [
                                           Text(
-                                            '$spo2',
+                                            // '60',
+                                            '$hr',
                                             // '100',
                                             style: TextStyle(
                                                 fontSize: 30,
@@ -155,6 +159,7 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                                         children: [
                                           Text(
                                             '37',
+                                            // '$temperature',
                                             // '$temperature',
                                             style: TextStyle(
                                                 fontSize: 30,
@@ -206,7 +211,8 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                                         textBaseline: TextBaseline.alphabetic,
                                         children: [
                                           Text(
-                                            '120/80',
+                                            // '120/80',
+                                            '$bp',
                                             style: TextStyle(
                                                 fontSize: 30,
                                                 fontWeight: FontWeight.w900,
@@ -253,7 +259,7 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                                         textBaseline: TextBaseline.alphabetic,
                                         children: [
                                           Text(
-                                            '99',
+                                            '$spo2',
                                             style: TextStyle(
                                                 fontSize: 30,
                                                 fontWeight: FontWeight.w900,
@@ -304,7 +310,8 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                                         textBaseline: TextBaseline.alphabetic,
                                         children: [
                                           Text(
-                                            '120',
+                                            // '120',
+                                            '$bg',
                                             style: TextStyle(
                                                 fontSize: 30,
                                                 fontWeight: FontWeight.w900,
@@ -351,7 +358,8 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                                         textBaseline: TextBaseline.alphabetic,
                                         children: [
                                           Text(
-                                            '79',
+                                            // '80',
+                                            '$weight',
                                             style: TextStyle(
                                                 fontSize: 30,
                                                 fontWeight: FontWeight.w900,
@@ -392,8 +400,8 @@ class ReusableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 170,
-      height: 130,
+      width: getProportionateScreenWidth(50),
+      height: getProportionateScreenHeight(150),
       child: cardChild,
       margin: EdgeInsets.all(15),
       padding: EdgeInsets.only(top: 10),
