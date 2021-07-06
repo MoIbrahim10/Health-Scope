@@ -149,7 +149,7 @@ class _BodyState extends State<Body> {
             SizedBox(height: 15.0),
             Container(
               width: double.infinity,
-              height: 150.0,
+              height: getProportionateScreenHeight(160),
               margin: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
               decoration: BoxDecoration(
                 color: Color(0XFFEB1555),
