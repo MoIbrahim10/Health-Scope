@@ -400,8 +400,8 @@ class ReusableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: getProportionateScreenWidth(50),
-      height: getProportionateScreenHeight(150),
+      width: getProportionateScreenWidth(56),
+      height: getProportionateScreenHeight(155),
       child: cardChild,
       margin: EdgeInsets.all(15),
       padding: EdgeInsets.only(top: 10),
