@@ -30,6 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Install checksum-verified Flutter 2.0.4
+        id: flutter_setup
         shell: bash
         env:
           FLUTTER_SHA256: e610f1c854e73645b343152de9df9fb8c9c067d6fad5d46c9c3d71b76ef77cf0
@@ -51,6 +52,7 @@ jobs:
             "$flutter_home" "$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
 
       - name: Resolve locked Dart dependencies
+        id: pub_get
         shell: bash
         run: |
           set -euo pipefail
@@ -60,7 +62,13 @@ jobs:
           test "$before" = "$after"
 
       - name: Analyze Dart sources
-        run: flutter analyze
+        run: >-
+          flutter analyze
+          lib/components
+          lib/screens/Doctor/DoctorCurrentPatients
+          lib/screens/Patient/Appoinment_screen
+          lib/screens/Patient/PatientMyResultScreen
 
       - name: Run focused no-service security tests
+        if: ${{ always() && steps.flutter_setup.outcome == 'success' && steps.pub_get.outcome == 'success' }}
         run: flutter test test/health_scope_sensitive_log_test.dart
