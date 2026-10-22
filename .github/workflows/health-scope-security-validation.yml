@@ -29,6 +29,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+      - name: Check out the unchanged base revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: security-baseline
+          persist-credentials: false
+
       - name: Install checksum-verified Flutter 2.0.4
         id: flutter_setup
         shell: bash
@@ -61,14 +68,174 @@ jobs:
           after="$(sha256sum pubspec.lock | awk '{print $1}')"
           test "$before" = "$after"
 
-      - name: Analyze Dart sources
+      - name: Resolve unchanged base dependencies
+        id: base_pub_get
+        shell: bash
         run: |
-          flutter analyze \
-            --no-current-package \
-            lib/components \
-            lib/screens/Doctor/DoctorCurrentPatients \
-            lib/screens/Patient/Appoinment_screen \
+          set -euo pipefail
+          for input_file in .metadata pubspec.yaml pubspec.lock; do
+            if ! cmp -s "$GITHUB_WORKSPACE/$input_file" \
+                "$GITHUB_WORKSPACE/security-baseline/$input_file"; then
+              printf 'Base and PR differ in analysis input: %s\n' "$input_file" >&2
+              exit 1
+            fi
+          done
+          cd "$GITHUB_WORKSPACE/security-baseline"
+          before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          flutter pub get
+          after="$(sha256sum pubspec.lock | awk '{print $1}')"
+          test "$before" = "$after"
+
+      - name: Compare sanitized targeted Dart analysis
+        id: analyze_compare
+        shell: bash
+        env:
+          TERM: dumb
+          NO_COLOR: '1'
+        run: |
+          set -uo pipefail
+          base_output="$RUNNER_TEMP/flutter-analyze-base.raw"
+          head_output="$RUNNER_TEMP/flutter-analyze-head.raw"
+          analyze_args=(
+            --no-current-package
+            lib/components
+            lib/screens/Doctor/DoctorCurrentPatients
+            lib/screens/Patient/Appoinment_screen
             lib/screens/Patient/PatientMyResultScreen
+          )
+
+          set +e
+          (cd "$GITHUB_WORKSPACE/security-baseline" && flutter analyze "${analyze_args[@]}" >"$base_output" 2>&1)
+          base_status=$?
+          flutter analyze "${analyze_args[@]}" >"$head_output" 2>&1
+          head_status=$?
+          set -e
+
+          printf 'base_exit_code=%s\nhead_exit_code=%s\n' \
+            "$base_status" "$head_status" >> "$GITHUB_OUTPUT"
+
+          python3 - "$base_output" "$head_output" "$base_status" "$head_status" "$GITHUB_STEP_SUMMARY" <<'PY'
+          import collections
+          import pathlib
+          import re
+          import sys
+
+          base_path, head_path = map(pathlib.Path, sys.argv[1:3])
+          base_status, head_status = map(int, sys.argv[3:5])
+          summary_path = pathlib.Path(sys.argv[5])
+          expected_roots = (
+              "lib/components/",
+              "lib/screens/Doctor/DoctorCurrentPatients/",
+              "lib/screens/Patient/Appoinment_screen/",
+              "lib/screens/Patient/PatientMyResultScreen/",
+          )
+          ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+          diagnostic = re.compile(
+              r"^\s*(error|warning|info)\s+•\s+.*\s+•\s+"
+              r"([^:\s]+):([1-9][0-9]*):[0-9]+\s+•\s+"
+              r"([A-Za-z_][A-Za-z0-9_]*)\s*$"
+          )
+
+          def read_diagnostics(path):
+              found = []
+              candidate_lines = 0
+              for raw in path.read_text(errors="replace").splitlines():
+                  line = ansi.sub("", raw)
+                  if re.match(r"^\s*(error|warning|info)\s+•", line):
+                      candidate_lines += 1
+                  match = diagnostic.fullmatch(line)
+                  if not match:
+                      continue
+                  severity, file_name, line_number, code = match.groups()
+                  normalized = pathlib.PurePosixPath(file_name)
+                  if normalized.is_absolute() or ".." in normalized.parts:
+                      continue
+                  if not normalized.as_posix().startswith(expected_roots):
+                      continue
+                  found.append({
+                      "severity": severity,
+                      "code": code,
+                      "file": normalized.as_posix(),
+                      "line": int(line_number),
+                  })
+              return found, candidate_lines
+
+          base, base_candidates = read_diagnostics(base_path)
+          head, head_candidates = read_diagnostics(head_path)
+
+          def key(item):
+              # Ignore line shifts caused by the five removed log statements.
+              return item["severity"], item["code"], item["file"]
+
+          base_counts = collections.Counter(map(key, base))
+          head_counts = collections.Counter(map(key, head))
+          remaining_new = head_counts - base_counts
+          new_items = []
+          for item in head:
+              item_key = key(item)
+              if remaining_new[item_key] > 0:
+                  new_items.append(item)
+                  remaining_new[item_key] -= 1
+
+          remaining_base = base_counts - head_counts
+          base_only_items = []
+          for item in base:
+              item_key = key(item)
+              if remaining_base[item_key] > 0:
+                  base_only_items.append(item)
+                  remaining_base[item_key] -= 1
+          with summary_path.open("a", encoding="utf-8") as summary:
+              summary.write("## Health-Scope targeted analyzer comparison\n\n")
+              summary.write(f"- Unchanged base analysis exit code: `{base_status}`\n")
+              summary.write(f"- Pull request head analysis exit code: `{head_status}`\n")
+              summary.write(
+                  "- Diagnostics are matched by severity, code, and repository-relative file; "
+                  "line shifts are ignored when matching existing diagnostics.\n"
+              )
+              summary.write(
+                  "- Stale `test/widget_test.dart` is outside this focused validation; "
+                  "only the dedicated no-service security test is run.\n\n"
+              )
+              summary.write("### New diagnostics on the pull request head\n\n")
+              if new_items:
+                  summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
+                  for item in new_items:
+                      summary.write(
+                          f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
+                      )
+              else:
+                  summary.write("No new diagnostics matched these fields.\n")
+              summary.write("\n### All pull request head diagnostics\n\n")
+              if head:
+                  summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
+                  for item in head:
+                      summary.write(
+                          f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
+                      )
+              else:
+                  summary.write("No recognized diagnostics.\n")
+              summary.write("\n### Base-only diagnostics\n\n")
+              if base_only_items:
+                  summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
+                  for item in base_only_items:
+                      summary.write(
+                          f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
+                      )
+              else:
+                  summary.write("No base-only diagnostics matched these fields.\n")
+              unparsed_base = max(0, base_candidates - len(base))
+              unparsed_head = max(0, head_candidates - len(head))
+              if unparsed_base or unparsed_head:
+                  summary.write(
+                      "\nUnclassified analyzer diagnostic lines were withheld "
+                      f"(base: {unparsed_base}; pull request head: {unparsed_head}).\n"
+                  )
+              summary.write(
+                  "\nOnly severity, diagnostic code, repository-relative file, and line are shown. "
+                  "Raw analyzer output and source snippets are withheld.\n"
+              )
+          PY
+          exit "$head_status"
 
       - name: Run focused no-service security tests
         if: ${{ always() && steps.flutter_setup.outcome == 'success' && steps.pub_get.outcome == 'success' }}
