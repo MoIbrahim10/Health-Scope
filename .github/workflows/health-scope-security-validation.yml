@@ -8,6 +8,9 @@ name: Health-Scope security validation
       - 'lib/screens/Doctor/DoctorCurrentPatients/PatientResust_dscreen.dart'
       - 'lib/screens/Patient/Appoinment_screen/body.dart'
       - 'lib/screens/Patient/PatientMyResultScreen/Patient_result_screen.dart'
+      - 'lib/screens/Patient/PatientChat/Patient_chat.dart'
+      - 'lib/screens/Patient/Patient profile/profile_screen.dart'
+      - 'lib/screens/Patient/Consulation_screen/Consultation.dart'
       - 'test/health_scope_sensitive_log_test.dart'
       - '.github/workflows/health-scope-security-validation.yml'
 
@@ -102,6 +105,9 @@ jobs:
             lib/screens/Doctor/DoctorCurrentPatients
             lib/screens/Patient/Appoinment_screen
             lib/screens/Patient/PatientMyResultScreen
+            'lib/screens/Patient/PatientChat/Patient_chat.dart'
+            'lib/screens/Patient/Patient profile/profile_screen.dart'
+            lib/screens/Patient/Consulation_screen/Consultation.dart
           )
 
           set +e

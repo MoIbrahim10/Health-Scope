@@ -123,7 +123,7 @@ class _BodyState extends State<Body> {
                           width: 35,
                           child: Stack(
                             fit: StackFit.expand,
-                            overflow: Overflow.visible,
+                            clipBehavior: Clip.none,
                             children: [
                               CircleAvatar(
                                 // radius: 15,
@@ -201,7 +201,7 @@ class _BodyState extends State<Body> {
                               width: 35,
                               child: Stack(
                                 fit: StackFit.expand,
-                                overflow: Overflow.visible,
+                                clipBehavior: Clip.none,
                                 children: [
                                   CircleAvatar(
                                     // radius: 15,
@@ -285,7 +285,7 @@ class _BodyState extends State<Body> {
                           width: 35,
                           child: Stack(
                             fit: StackFit.expand,
-                            overflow: Overflow.visible,
+                            clipBehavior: Clip.none,
                             children: [
                               CircleAvatar(
                                 // radius: 15,
@@ -361,7 +361,7 @@ class _BodyState extends State<Body> {
                           width: 35,
                           child: Stack(
                             fit: StackFit.expand,
-                            overflow: Overflow.visible,
+                            clipBehavior: Clip.none,
                             children: [
                               CircleAvatar(
                                 // radius: 15,
@@ -437,7 +437,7 @@ class _BodyState extends State<Body> {
                           width: 35,
                           child: Stack(
                             fit: StackFit.expand,
-                            overflow: Overflow.visible,
+                            clipBehavior: Clip.none,
                             children: [
                               CircleAvatar(
                                 // radius: 15,
