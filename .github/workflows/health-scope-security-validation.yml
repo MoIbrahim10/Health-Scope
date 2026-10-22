@@ -123,22 +123,17 @@ jobs:
           base_path, head_path = map(pathlib.Path, sys.argv[1:3])
           base_status, head_status = map(int, sys.argv[3:5])
           summary_path = pathlib.Path(sys.argv[5])
-          expected_roots = (
-              "lib/components/",
-              "lib/screens/Doctor/DoctorCurrentPatients/",
-              "lib/screens/Patient/Appoinment_screen/",
-              "lib/screens/Patient/PatientMyResultScreen/",
-          )
           ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
           diagnostic = re.compile(
               r"^\s*(error|warning|info)\s+•\s+.*\s+•\s+"
-              r"([^:\s]+):([1-9][0-9]*):[0-9]+\s+•\s+"
-              r"([A-Za-z_][A-Za-z0-9_]*)\s*$"
+              r"([^\s•]+):([1-9][0-9]*):[0-9]+\s+•\s+"
+              r"([A-Za-z0-9_]+)\s*$"
           )
+          location_only = re.compile(r"([^\s•]+):([1-9][0-9]*):[0-9]+(?:\s+•\s+([A-Za-z0-9_]+))?\s*$")
 
           def read_diagnostics(path):
               found = []
-              unclassified = collections.Counter()
+              placeholders = 0
               lines = path.read_text(errors="replace").splitlines()
               index = 0
               while index < len(lines):
@@ -159,37 +154,58 @@ jobs:
                       match = diagnostic.fullmatch(" ".join(fragments))
                       lookahead += 1
                   index += 1
+                  was_unmatched = not match
                   if not match:
-                      unclassified[severity_prefix] += 1
-                      continue
-                  severity, file_name, line_number, code = match.groups()
+                      severity = severity_prefix
+                      safe_text = " ".join(fragments)
+                      location_match = location_only.search(safe_text)
+                      file_name = location_match.group(1) if location_match else ""
+                      line_number = location_match.group(2) if location_match else "0"
+                      code = location_match.group(3) if location_match else "unknown"
+                  else:
+                      severity, file_name, line_number, code = match.groups()
                   normalized = pathlib.PurePosixPath(file_name)
-                  if normalized.is_absolute() or ".." in normalized.parts:
-                      unclassified[severity] += 1
+                  if (
+                      not file_name
+                      or normalized.is_absolute()
+                      or ".." in normalized.parts
+                      or not normalized.as_posix().startswith("lib/")
+                  ):
+                      placeholders += 1
+                      found.append({
+                          "severity": severity,
+                          "code": "unknown",
+                          "file": "unknown",
+                          "line": 0,
+                      })
                       continue
-                  if not normalized.as_posix().startswith(expected_roots):
-                      unclassified[severity] += 1
-                      continue
+                  if was_unmatched and (code == "unknown" or line_number == "0"):
+                      placeholders += 1
                   found.append({
                       "severity": severity,
                       "code": code,
                       "file": normalized.as_posix(),
                       "line": int(line_number),
                   })
-              return found, unclassified
+              return found, placeholders
 
-          base, base_unclassified = read_diagnostics(base_path)
-          head, head_unclassified = read_diagnostics(head_path)
+          base, base_placeholders = read_diagnostics(base_path)
+          head, head_placeholders = read_diagnostics(head_path)
 
           def key(item):
               # Ignore line shifts caused by the five removed log statements.
               return item["severity"], item["code"], item["file"]
 
-          base_counts = collections.Counter(map(key, base))
-          head_counts = collections.Counter(map(key, head))
+          def fully_classified(item):
+              return item["code"] != "unknown" and item["file"] != "unknown" and item["line"] > 0
+
+          base_classified = [item for item in base if fully_classified(item)]
+          head_classified = [item for item in head if fully_classified(item)]
+          base_counts = collections.Counter(map(key, base_classified))
+          head_counts = collections.Counter(map(key, head_classified))
           remaining_new = head_counts - base_counts
           new_items = []
-          for item in head:
+          for item in head_classified:
               item_key = key(item)
               if remaining_new[item_key] > 0:
                   new_items.append(item)
@@ -226,7 +242,7 @@ jobs:
                           f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
                       )
               else:
-                  summary.write("No new diagnostics matched these fields.\n")
+                  summary.write("No new fully classified diagnostics matched these fields.\n")
               summary.write("\n### All pull request head diagnostics\n\n")
               if head:
                   summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
@@ -245,17 +261,25 @@ jobs:
                       )
               else:
                   summary.write("No base-only diagnostics matched these fields.\n")
-              if base_unclassified or head_unclassified:
-                  format_counts = lambda values: ", ".join(
-                      f"{severity}={values[severity]}"
-                      for severity in ("error", "warning", "info")
-                      if values[severity]
-                  ) or "none"
+              base_unknown_severity = collections.Counter(
+                  item["severity"] for item in base if not fully_classified(item)
+              )
+              head_unknown_severity = collections.Counter(
+                  item["severity"] for item in head if not fully_classified(item)
+              )
+              if base_placeholders or head_placeholders:
+                  def format_severity_counts(values):
+                      return ", ".join(
+                          f"{severity}={values[severity]}"
+                          for severity in ("error", "warning", "info")
+                          if values[severity]
+                      ) or "none"
                   summary.write(
-                      "\nUnclassified diagnostic counts by severity were withheld from detail "
-                      "(base: "
-                      f"{format_counts(base_unclassified)}; pull request head: "
-                      f"{format_counts(head_unclassified)}). Their raw text is not exposed.\n"
+                      "\nSome diagnostic fields could not be safely parsed and appear as "
+                      "`unknown` placeholders. Their counts by severity are "
+                      f"(base: {format_severity_counts(base_unknown_severity)}; "
+                      f"pull request head: {format_severity_counts(head_unknown_severity)}). "
+                      "They are excluded from the new-diagnostic comparison. Raw text is withheld.\n"
                   )
               summary.write(
                   "\nOnly severity, diagnostic code, repository-relative file, and line are shown. "
