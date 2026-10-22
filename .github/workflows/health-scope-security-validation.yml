@@ -1,6 +1,6 @@
 name: Health-Scope security validation
 
-on:
+'on':
   pull_request:
     paths:
       - 'lib/components/search_field.dart'
