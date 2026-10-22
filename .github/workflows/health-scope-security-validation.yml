@@ -131,6 +131,12 @@ jobs:
           )
           location_only = re.compile(r"([^\s•]+):([1-9][0-9]*):[0-9]+(?:\s+•\s+([A-Za-z0-9_]+))?\s*$")
 
+          def private_normalized_entry(fragments):
+              # Retain the normalized entry only in runner memory for equality checks.
+              # Never add this value to the job summary, outputs, or annotations.
+              joined = " ".join(ansi.sub("", fragment).strip() for fragment in fragments)
+              return re.sub(r"(?<=:)\d+:\d+\b", "<line>:<column>", joined)
+
           def read_diagnostics(path):
               found = []
               placeholders = 0
@@ -177,16 +183,20 @@ jobs:
                           "code": "unknown",
                           "file": "unknown",
                           "line": 0,
+                          "private_entry": private_normalized_entry(fragments),
                       })
                       continue
                   if was_unmatched and (code == "unknown" or line_number == "0"):
                       placeholders += 1
-                  found.append({
+                  item = {
                       "severity": severity,
                       "code": code,
                       "file": normalized.as_posix(),
                       "line": int(line_number),
-                  })
+                  }
+                  if code == "unknown" or line_number == "0":
+                      item["private_entry"] = private_normalized_entry(fragments)
+                  found.append(item)
               return found, placeholders
 
           base, base_placeholders = read_diagnostics(base_path)
@@ -201,6 +211,8 @@ jobs:
 
           base_classified = [item for item in base if fully_classified(item)]
           head_classified = [item for item in head if fully_classified(item)]
+          base_unclassified = [item for item in base if not fully_classified(item)]
+          head_unclassified = [item for item in head if not fully_classified(item)]
           base_counts = collections.Counter(map(key, base_classified))
           head_counts = collections.Counter(map(key, head_classified))
           remaining_new = head_counts - base_counts
@@ -213,11 +225,20 @@ jobs:
 
           remaining_base = base_counts - head_counts
           base_only_items = []
-          for item in base:
+          for item in base_classified:
               item_key = key(item)
               if remaining_base[item_key] > 0:
                   base_only_items.append(item)
                   remaining_base[item_key] -= 1
+          base_private_counts = collections.Counter(
+              item["private_entry"] for item in base_unclassified
+          )
+          head_private_counts = collections.Counter(
+              item["private_entry"] for item in head_unclassified
+          )
+          matched_private_count = sum((base_private_counts & head_private_counts).values())
+          new_private_count = sum((head_private_counts - base_private_counts).values())
+          base_only_private_count = sum((base_private_counts - head_private_counts).values())
           with summary_path.open("a", encoding="utf-8") as summary:
               summary.write("## Health-Scope targeted analyzer comparison\n\n")
               summary.write(f"- Unchanged base analysis exit code: `{base_status}`\n")
@@ -241,8 +262,15 @@ jobs:
                       summary.write(
                           f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
                       )
-              else:
-                  summary.write("No new fully classified diagnostics matched these fields.\n")
+              if new_private_count:
+                  summary.write(
+                      f"Unclassified diagnostics with no base match: `{new_private_count}`; "
+                      "their identities and text are withheld.\n"
+                  )
+              if not new_items and not new_private_count:
+                  summary.write(
+                      "No new diagnostics were found by the classified and private-normalized comparisons.\n"
+                  )
               summary.write("\n### All pull request head diagnostics\n\n")
               if head:
                   summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
@@ -260,7 +288,12 @@ jobs:
                           f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
                       )
               else:
-                  summary.write("No base-only diagnostics matched these fields.\n")
+                  summary.write("No fully classified base-only diagnostics matched these fields.\n")
+              if base_only_private_count:
+                  summary.write(
+                      f"Unclassified diagnostics present only on the unchanged base: "
+                      f"`{base_only_private_count}`; their identities and text are withheld.\n"
+                  )
               base_unknown_severity = collections.Counter(
                   item["severity"] for item in base if not fully_classified(item)
               )
@@ -275,11 +308,12 @@ jobs:
                           if values[severity]
                       ) or "none"
                   summary.write(
-                      "\nSome diagnostic fields could not be safely parsed and appear as "
-                      "`unknown` placeholders. Their counts by severity are "
+                      "\nUnclassified entries are compared privately after line/column normalization; "
+                      "their identities and raw text are withheld. Counts by severity are "
                       f"(base: {format_severity_counts(base_unknown_severity)}; "
                       f"pull request head: {format_severity_counts(head_unknown_severity)}). "
-                      "They are excluded from the new-diagnostic comparison. Raw text is withheld.\n"
+                      f"Private comparison: matched={matched_private_count}, "
+                      f"head-only={new_private_count}, base-only={base_only_private_count}.\n"
                   )
               summary.write(
                   "\nOnly severity, diagnostic code, repository-relative file, and line are shown. "
