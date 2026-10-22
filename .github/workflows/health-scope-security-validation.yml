@@ -138,19 +138,37 @@ jobs:
 
           def read_diagnostics(path):
               found = []
-              candidate_lines = 0
-              for raw in path.read_text(errors="replace").splitlines():
-                  line = ansi.sub("", raw)
-                  if re.match(r"^\s*(error|warning|info)\s+•", line):
-                      candidate_lines += 1
-                  match = diagnostic.fullmatch(line)
+              unclassified = collections.Counter()
+              lines = path.read_text(errors="replace").splitlines()
+              index = 0
+              while index < len(lines):
+                  line = ansi.sub("", lines[index])
+                  start = re.match(r"^\s*(error|warning|info)\s+•", line)
+                  if not start:
+                      index += 1
+                      continue
+                  severity_prefix = start.group(1)
+                  fragments = [line.strip()]
+                  match = diagnostic.fullmatch(" ".join(fragments))
+                  lookahead = index + 1
+                  while not match and lookahead < len(lines) and lookahead <= index + 8:
+                      continuation = ansi.sub("", lines[lookahead])
+                      if re.match(r"^\s*(error|warning|info)\s+•", continuation):
+                          break
+                      fragments.append(continuation.strip())
+                      match = diagnostic.fullmatch(" ".join(fragments))
+                      lookahead += 1
+                  index += 1
                   if not match:
+                      unclassified[severity_prefix] += 1
                       continue
                   severity, file_name, line_number, code = match.groups()
                   normalized = pathlib.PurePosixPath(file_name)
                   if normalized.is_absolute() or ".." in normalized.parts:
+                      unclassified[severity] += 1
                       continue
                   if not normalized.as_posix().startswith(expected_roots):
+                      unclassified[severity] += 1
                       continue
                   found.append({
                       "severity": severity,
@@ -158,10 +176,10 @@ jobs:
                       "file": normalized.as_posix(),
                       "line": int(line_number),
                   })
-              return found, candidate_lines
+              return found, unclassified
 
-          base, base_candidates = read_diagnostics(base_path)
-          head, head_candidates = read_diagnostics(head_path)
+          base, base_unclassified = read_diagnostics(base_path)
+          head, head_unclassified = read_diagnostics(head_path)
 
           def key(item):
               # Ignore line shifts caused by the five removed log statements.
@@ -196,6 +214,10 @@ jobs:
                   "- Stale `test/widget_test.dart` is outside this focused validation; "
                   "only the dedicated no-service security test is run.\n\n"
               )
+              summary.write(
+                  "- Flutter 2.0.4 treats info-level findings as fatal by default; "
+                  "the analyzer's actual exit status is preserved.\n\n"
+              )
               summary.write("### New diagnostics on the pull request head\n\n")
               if new_items:
                   summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
@@ -223,12 +245,17 @@ jobs:
                       )
               else:
                   summary.write("No base-only diagnostics matched these fields.\n")
-              unparsed_base = max(0, base_candidates - len(base))
-              unparsed_head = max(0, head_candidates - len(head))
-              if unparsed_base or unparsed_head:
+              if base_unclassified or head_unclassified:
+                  format_counts = lambda values: ", ".join(
+                      f"{severity}={values[severity]}"
+                      for severity in ("error", "warning", "info")
+                      if values[severity]
+                  ) or "none"
                   summary.write(
-                      "\nUnclassified analyzer diagnostic lines were withheld "
-                      f"(base: {unparsed_base}; pull request head: {unparsed_head}).\n"
+                      "\nUnclassified diagnostic counts by severity were withheld from detail "
+                      "(base: "
+                      f"{format_counts(base_unclassified)}; pull request head: "
+                      f"{format_counts(head_unclassified)}). Their raw text is not exposed.\n"
                   )
               summary.write(
                   "\nOnly severity, diagnostic code, repository-relative file, and line are shown. "
