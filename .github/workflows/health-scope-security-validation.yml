@@ -21,7 +21,6 @@ jobs:
     timeout-minutes: 25
     env:
       CI: 'true'
-      PUB_CACHE: ${{ runner.temp }}/pub-cache
 
     steps:
       - name: Check out the pull request head
