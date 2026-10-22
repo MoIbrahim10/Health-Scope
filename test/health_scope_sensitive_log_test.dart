@@ -7,6 +7,14 @@ import 'package:healthscope/screens/Doctor/DoctorCurrentPatients/Doctor_currentp
     as doctor_search;
 import 'package:healthscope/screens/Patient/Appoinment_screen/body.dart'
     as appointment_search;
+import 'package:healthscope/screens/Patient/Appoinment_screen/Appoinment.dart'
+    as patient_appointment;
+import 'package:healthscope/screens/Patient/Consulation_screen/Consultation.dart'
+    as patient_consultation;
+import 'package:healthscope/screens/Patient/Patient%20profile/profile_screen.dart'
+    as patient_profile;
+import 'package:healthscope/screens/Patient/PatientChat/Patient_chat.dart'
+    as patient_chat;
 import 'package:healthscope/size_config.dart';
 
 const _syntheticSearchText = 'health-scope-private-search-regression-marker';
@@ -33,6 +41,17 @@ Future<void> _expectSearchFieldAcceptsText(
 }
 
 void main() {
+  test('patient navigation consumers compile with selectedMenu', () {
+    final screens = <Widget>[
+      patient_appointment.Appoinment(),
+      patient_consultation.Consultation(),
+      patient_profile.ProfileScreen(),
+      patient_chat.PatientChat(),
+    ];
+
+    expect(screens, hasLength(4));
+  });
+
   testWidgets('shared search field accepts text', (tester) async {
     await _expectSearchFieldAcceptsText(
       tester,

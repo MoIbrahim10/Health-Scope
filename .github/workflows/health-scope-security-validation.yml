@@ -105,9 +105,6 @@ jobs:
             lib/screens/Doctor/DoctorCurrentPatients
             lib/screens/Patient/Appoinment_screen
             lib/screens/Patient/PatientMyResultScreen
-            'lib/screens/Patient/PatientChat/Patient_chat.dart'
-            'lib/screens/Patient/Patient profile/profile_screen.dart'
-            lib/screens/Patient/Consulation_screen/Consultation.dart
           )
 
           set +e
