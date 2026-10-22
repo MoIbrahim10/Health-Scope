@@ -1,0 +1,67 @@
+name: Health-Scope security validation
+
+on:
+  pull_request:
+    paths:
+      - 'lib/components/search_field.dart'
+      - 'lib/screens/Doctor/DoctorCurrentPatients/Doctor_currentpatient_screen.dart'
+      - 'lib/screens/Doctor/DoctorCurrentPatients/PatientResust_dscreen.dart'
+      - 'lib/screens/Patient/Appoinment_screen/body.dart'
+      - 'lib/screens/Patient/PatientMyResultScreen/Patient_result_screen.dart'
+      - 'test/health_scope_sensitive_log_test.dart'
+      - '.github/workflows/health-scope-security-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  focused-validation:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      PUB_CACHE: ${{ runner.temp }}/pub-cache
+
+    steps:
+      - name: Check out the pull request head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Install checksum-verified Flutter 2.0.4
+        shell: bash
+        env:
+          FLUTTER_SHA256: e610f1c854e73645b343152de9df9fb8c9c067d6fad5d46c9c3d71b76ef77cf0
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/flutter_linux_2.0.4-stable.tar.xz"
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 300 \
+            'https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_2.0.4-stable.tar.xz' \
+            --output "$archive"
+          printf '%s  %s\n' "$FLUTTER_SHA256" "$archive" | sha256sum --check
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          flutter_home="$RUNNER_TEMP/health-scope-flutter-home"
+          mkdir -p "$flutter_home" "$RUNNER_TEMP/pub-cache"
+          export HOME="$flutter_home"
+          export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+          flutter config --no-analytics
+          printf '%s\n' "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          printf 'HOME=%s\nPUB_CACHE=%s\n' \
+            "$flutter_home" "$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
+
+      - name: Resolve locked Dart dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          flutter pub get
+          after="$(sha256sum pubspec.lock | awk '{print $1}')"
+          test "$before" = "$after"
+
+      - name: Analyze Dart sources
+        run: flutter analyze
+
+      - name: Run focused no-service security tests
+        run: flutter test test/health_scope_sensitive_log_test.dart

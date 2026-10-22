@@ -56,7 +56,6 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                       var temperature = snapshot.value['Temperature']['val'];
                       var weight = snapshot.value['Weight']['val'];
 
-                      print(snapshot.value);
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
