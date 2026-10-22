@@ -126,11 +126,11 @@ jobs:
           ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
           diagnostic = re.compile(
               r"^\s*(error|warning|info)\s+•\s+.*\s+•\s+"
-              r"([^\s•]+):([1-9][0-9]*):[0-9]+\s+•\s+"
+              r"([^•\r\n]*?\.dart):([1-9][0-9]*):[0-9]+\s+•\s+"
               r"([A-Za-z0-9_]+)\s*$"
           )
           location_only = re.compile(
-              r"([^\s•]+\.dart):([1-9][0-9]*):[0-9]+"
+              r"•\s+([^•\r\n]*?\.dart):([1-9][0-9]*):[0-9]+"
               r"(?:\s+•\s+([A-Za-z0-9_]+))?"
           )
 
@@ -142,7 +142,7 @@ jobs:
 
           def safe_repository_file(file_name, repo_root):
               try:
-                  supplied = pathlib.Path(file_name)
+                  supplied = pathlib.Path(file_name.strip())
                   candidate = supplied if supplied.is_absolute() else repo_root / supplied
                   relative = candidate.resolve().relative_to(repo_root.resolve())
               except (OSError, ValueError):
@@ -151,7 +151,7 @@ jobs:
               if (
                   normalized.is_absolute()
                   or ".." in normalized.parts
-                  or not re.fullmatch(r"[A-Za-z0-9_./-]+\.dart", normalized.as_posix())
+                  or not re.fullmatch(r"[A-Za-z0-9_./ -]+\.dart", normalized.as_posix())
               ):
                   return None
               return normalized.as_posix()

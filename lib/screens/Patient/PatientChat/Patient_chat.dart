@@ -25,7 +25,7 @@ class PatientChat extends StatelessWidget {
         ),
       ),
       bottomNavigationBar:
-          PatientBottomNavBar(PselectedMenu: MenuState.Patient_Chat),
+          PatientBottomNavBar(selectedMenu: MenuState.Patient_Chat),
     );
   }
 }

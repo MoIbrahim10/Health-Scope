@@ -53,7 +53,6 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                       var bg = snapshot.value['Bloodglucose']['val'];
                       var bp = snapshot.value['Bloodpressure']['val'];
                       var hr = snapshot.value['Heartrate']['val'];
-                      var temperature = snapshot.value['Temperature']['val'];
                       var weight = snapshot.value['Weight']['val'];
 
                       return Column(
@@ -141,8 +140,6 @@ class _PatientScreenBodyState extends State<PatientScreenBody> {
                                         children: [
                                           Text(
                                             '37',
-                                            // '$temperature',
-                                            // '$temperature',
                                             style: TextStyle(
                                                 fontSize: 30,
                                                 fontWeight: FontWeight.w900,

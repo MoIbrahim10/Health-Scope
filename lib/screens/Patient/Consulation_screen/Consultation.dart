@@ -18,7 +18,7 @@ class Consultation extends StatelessWidget {
       ),
       body: Body(),
       bottomNavigationBar:
-          PatientBottomNavBar(PselectedMenu: MenuState.patientConsultation),
+          PatientBottomNavBar(selectedMenu: MenuState.patientConsultation),
     );
   }
 }

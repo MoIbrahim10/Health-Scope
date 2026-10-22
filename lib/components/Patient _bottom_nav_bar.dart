@@ -11,10 +11,10 @@ import '../enums.dart';
 class PatientBottomNavBar extends StatelessWidget {
   const PatientBottomNavBar({
     Key key,
-    @required this.PselectedMenu,
+    @required this.selectedMenu,
   }) : super(key: key);
 
-  final MenuState PselectedMenu;
+  final MenuState selectedMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +43,7 @@ class PatientBottomNavBar extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   Icons.assignment_outlined,
-                  color: MenuState.PatientResults == PselectedMenu
+                  color: MenuState.PatientResults == selectedMenu
                       ? kPrimaryColor
                       : inActiveIconColor,
                 ),
@@ -53,7 +53,7 @@ class PatientBottomNavBar extends StatelessWidget {
               IconButton(
                 icon: SvgPicture.asset(
                   "assets/icons/consultation.svg",
-                  color: MenuState.patientConsultation == PselectedMenu
+                  color: MenuState.patientConsultation == selectedMenu
                       ? kPrimaryColor
                       : inActiveIconColor,
                 ),
@@ -63,7 +63,7 @@ class PatientBottomNavBar extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   Icons.date_range,
-                  color: MenuState.patientAppointment == PselectedMenu
+                  color: MenuState.patientAppointment == selectedMenu
                       ? kPrimaryColor
                       : inActiveIconColor,
                 ),
@@ -73,7 +73,7 @@ class PatientBottomNavBar extends StatelessWidget {
               IconButton(
                 icon: SvgPicture.asset(
                   "assets/icons/Conversation.svg",
-                  color: MenuState.Patient_Chat == PselectedMenu
+                  color: MenuState.Patient_Chat == selectedMenu
                       ? kPrimaryColor
                       : inActiveIconColor,
                 ),
@@ -84,7 +84,7 @@ class PatientBottomNavBar extends StatelessWidget {
               IconButton(
                 icon: SvgPicture.asset(
                   "assets/icons/User Icon.svg",
-                  color: MenuState.profile == PselectedMenu
+                  color: MenuState.profile == selectedMenu
                       ? kPrimaryColor
                       : inActiveIconColor,
                 ),

@@ -17,7 +17,7 @@ class ProfileScreen extends StatelessWidget {
       ),
       body: Body(),
       bottomNavigationBar:
-          PatientBottomNavBar(PselectedMenu: MenuState.profile),
+          PatientBottomNavBar(selectedMenu: MenuState.profile),
     );
   }
 }
