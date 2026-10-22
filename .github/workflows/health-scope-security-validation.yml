@@ -62,12 +62,13 @@ jobs:
           test "$before" = "$after"
 
       - name: Analyze Dart sources
-        run: >-
-          flutter analyze
-          lib/components
-          lib/screens/Doctor/DoctorCurrentPatients
-          lib/screens/Patient/Appoinment_screen
-          lib/screens/Patient/PatientMyResultScreen
+        run: |
+          flutter analyze \
+            --no-current-package \
+            lib/components \
+            lib/screens/Doctor/DoctorCurrentPatients \
+            lib/screens/Patient/Appoinment_screen \
+            lib/screens/Patient/PatientMyResultScreen
 
       - name: Run focused no-service security tests
         if: ${{ always() && steps.flutter_setup.outcome == 'success' && steps.pub_get.outcome == 'success' }}
