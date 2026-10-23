@@ -16,7 +16,8 @@ class DoctorScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          FlatButton(
+          TextButton(
+            style: TextButton.styleFrom(primary: Colors.white),
             onPressed: () =>
                 Navigator.pushNamed(context, SignInScreen.routeName),
             child: SvgPicture.asset(
@@ -96,7 +97,6 @@ class SearchField extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
       ),
       child: TextField(
-        onChanged: (value) => print(value),
         decoration: InputDecoration(
             contentPadding: EdgeInsets.symmetric(
                 horizontal: getProportionateScreenWidth(20),
@@ -386,7 +386,7 @@ class Bodyyy extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Backdrop(size: size, patieent: pPatient),
-            PatentInfo(Patientname: pPatient),
+            PatentInfo(patientName: pPatient),
             Padding(
               padding: const EdgeInsets.only(left: 30),
               child: Text(
@@ -466,10 +466,10 @@ class Backdrop extends StatelessWidget {
 class PatentInfo extends StatelessWidget {
   const PatentInfo({
     Key key,
-    @required this.Patientname,
+    @required this.patientName,
   }) : super(key: key);
 
-  final Patient Patientname;
+  final Patient patientName;
 
   @override
   Widget build(BuildContext context) {
@@ -483,7 +483,7 @@ class PatentInfo extends StatelessWidget {
               children: <Widget>[
                 Container(
                   child: Text(
-                    Patientname.patientName,
+                    patientName.patientName,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 25,
@@ -494,7 +494,7 @@ class PatentInfo extends StatelessWidget {
                 SizedBox(height: 5),
                 Container(
                   child: Text(
-                    'Age: ${Patientname.age}',
+                    'Age: ${patientName.age}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -504,7 +504,7 @@ class PatentInfo extends StatelessWidget {
                 ),
                 Container(
                   child: Text(
-                    'Phone Number: +${Patientname.phoneNumber}',
+                    'Phone Number: +${patientName.phoneNumber}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -514,7 +514,7 @@ class PatentInfo extends StatelessWidget {
                 ),
                 Container(
                   child: Text(
-                    'Height: ${Patientname.height}',
+                    'Height: ${patientName.height}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -524,7 +524,7 @@ class PatentInfo extends StatelessWidget {
                 ),
                 Container(
                   child: Text(
-                    'Blood Type: ${Patientname.bloodType}',
+                    'Blood Type: ${patientName.bloodType}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -611,7 +611,7 @@ class IconBtnWithCounter extends StatelessWidget {
       borderRadius: BorderRadius.circular(100),
       onTap: press,
       child: Stack(
-        overflow: Overflow.visible,
+        clipBehavior: Clip.none,
         children: [
           Container(
             padding: EdgeInsets.all(getProportionateScreenWidth(12)),

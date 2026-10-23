@@ -187,13 +187,16 @@ class _BodyState extends State<Body> {
                             ),
                           ),
                           Spacer(),
-                          RaisedButton(
-                            onPressed: () {},
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25.0),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              primary: Color(0xFFF3F3F3),
+                              onPrimary: Colors.black87,
+                              elevation: 2.0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25.0),
+                              ),
                             ),
-                            color: Color(0xFFF3F3F3),
-                            elevation: 2.0,
+                            onPressed: () {},
                             child: SizedBox(
                               width: 150.0,
                               height: 50.0,
@@ -297,7 +300,6 @@ class SearchField extends StatelessWidget {
           borderRadius: BorderRadius.circular(15),
         ),
         child: TextField(
-          onChanged: (value) => print(value),
           decoration: InputDecoration(
               contentPadding: EdgeInsets.symmetric(
                   horizontal: getProportionateScreenWidth(25),
@@ -551,8 +553,10 @@ extension OnPressed on Widget {
             right: 0,
             top: 0,
             bottom: 0,
-            child: FlatButton(
-                shape: RoundedRectangleBorder(borderRadius: borderRadius),
+            child: TextButton(
+                style: TextButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: borderRadius),
+                ),
                 onPressed: () {
                   if (onPressed != null) {
                     onPressed();

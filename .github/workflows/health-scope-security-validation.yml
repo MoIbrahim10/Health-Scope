@@ -1,0 +1,347 @@
+name: Health-Scope security validation
+
+'on':
+  pull_request:
+    paths:
+      - 'lib/components/search_field.dart'
+      - 'lib/screens/Doctor/DoctorCurrentPatients/Doctor_currentpatient_screen.dart'
+      - 'lib/screens/Doctor/DoctorCurrentPatients/PatientResust_dscreen.dart'
+      - 'lib/screens/Patient/Appoinment_screen/body.dart'
+      - 'lib/screens/Patient/PatientMyResultScreen/Patient_result_screen.dart'
+      - 'lib/screens/Patient/PatientChat/Patient_chat.dart'
+      - 'lib/screens/Patient/Patient profile/profile_screen.dart'
+      - 'lib/screens/Patient/Consulation_screen/Consultation.dart'
+      - 'test/health_scope_sensitive_log_test.dart'
+      - '.github/workflows/health-scope-security-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  focused-validation:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Check out the pull request head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Check out the unchanged base revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: security-baseline
+          persist-credentials: false
+
+      - name: Install checksum-verified Flutter 2.0.4
+        id: flutter_setup
+        shell: bash
+        env:
+          FLUTTER_SHA256: e610f1c854e73645b343152de9df9fb8c9c067d6fad5d46c9c3d71b76ef77cf0
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/flutter_linux_2.0.4-stable.tar.xz"
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 300 \
+            'https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_2.0.4-stable.tar.xz' \
+            --output "$archive"
+          printf '%s  %s\n' "$FLUTTER_SHA256" "$archive" | sha256sum --check
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          flutter_home="$RUNNER_TEMP/health-scope-flutter-home"
+          mkdir -p "$flutter_home" "$RUNNER_TEMP/pub-cache"
+          export HOME="$flutter_home"
+          export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+          flutter config --no-analytics
+          printf '%s\n' "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          printf 'HOME=%s\nPUB_CACHE=%s\n' \
+            "$flutter_home" "$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
+
+      - name: Resolve locked Dart dependencies
+        id: pub_get
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          flutter pub get
+          after="$(sha256sum pubspec.lock | awk '{print $1}')"
+          test "$before" = "$after"
+
+      - name: Resolve unchanged base dependencies
+        id: base_pub_get
+        shell: bash
+        run: |
+          set -euo pipefail
+          for input_file in .metadata pubspec.yaml pubspec.lock; do
+            if ! cmp -s "$GITHUB_WORKSPACE/$input_file" \
+                "$GITHUB_WORKSPACE/security-baseline/$input_file"; then
+              printf 'Base and PR differ in analysis input: %s\n' "$input_file" >&2
+              exit 1
+            fi
+          done
+          cd "$GITHUB_WORKSPACE/security-baseline"
+          before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          flutter pub get
+          after="$(sha256sum pubspec.lock | awk '{print $1}')"
+          test "$before" = "$after"
+
+      - name: Compare sanitized targeted Dart analysis
+        id: analyze_compare
+        shell: bash
+        env:
+          TERM: dumb
+          NO_COLOR: '1'
+        run: |
+          set -uo pipefail
+          base_output="$RUNNER_TEMP/flutter-analyze-base.raw"
+          head_output="$RUNNER_TEMP/flutter-analyze-head.raw"
+          analyze_args=(
+            --no-current-package
+            lib/components
+            lib/screens/Doctor/DoctorCurrentPatients
+            lib/screens/Patient/Appoinment_screen
+            lib/screens/Patient/PatientMyResultScreen
+          )
+
+          set +e
+          (cd "$GITHUB_WORKSPACE/security-baseline" && flutter analyze "${analyze_args[@]}" >"$base_output" 2>&1)
+          base_status=$?
+          flutter analyze "${analyze_args[@]}" >"$head_output" 2>&1
+          head_status=$?
+          set -e
+
+          printf 'base_exit_code=%s\nhead_exit_code=%s\n' \
+            "$base_status" "$head_status" >> "$GITHUB_OUTPUT"
+
+          python3 - "$base_output" "$head_output" "$base_status" "$head_status" "$GITHUB_STEP_SUMMARY" <<'PY'
+          import collections
+          import pathlib
+          import re
+          import sys
+
+          base_path, head_path = map(pathlib.Path, sys.argv[1:3])
+          base_status, head_status = map(int, sys.argv[3:5])
+          summary_path = pathlib.Path(sys.argv[5])
+          ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+          diagnostic = re.compile(
+              r"^\s*(error|warning|info)\s+•\s+.*\s+•\s+"
+              r"([^•\r\n]*?\.dart):([1-9][0-9]*):[0-9]+\s+•\s+"
+              r"([A-Za-z0-9_]+)\s*$"
+          )
+          location_only = re.compile(
+              r"•\s+([^•\r\n]*?\.dart):([1-9][0-9]*):[0-9]+"
+              r"(?:\s+•\s+([A-Za-z0-9_]+))?"
+          )
+
+          def private_normalized_entry(fragments):
+              # Retain the normalized entry only in runner memory for equality checks.
+              # Never add this value to the job summary, outputs, or annotations.
+              joined = " ".join(ansi.sub("", fragment).strip() for fragment in fragments)
+              return re.sub(r"(?<=:)\d+:\d+\b", "<line>:<column>", joined)
+
+          def safe_repository_file(file_name, repo_root):
+              try:
+                  supplied = pathlib.Path(file_name.strip())
+                  candidate = supplied if supplied.is_absolute() else repo_root / supplied
+                  relative = candidate.resolve().relative_to(repo_root.resolve())
+              except (OSError, ValueError):
+                  return None
+              normalized = pathlib.PurePosixPath(relative.as_posix())
+              if (
+                  normalized.is_absolute()
+                  or ".." in normalized.parts
+                  or not re.fullmatch(r"[A-Za-z0-9_./ -]+\.dart", normalized.as_posix())
+              ):
+                  return None
+              return normalized.as_posix()
+
+          def read_diagnostics(path, repo_root):
+              found = []
+              placeholders = 0
+              lines = path.read_text(errors="replace").splitlines()
+              index = 0
+              while index < len(lines):
+                  line = ansi.sub("", lines[index])
+                  start = re.match(r"^\s*(error|warning|info)\s+•", line)
+                  if not start:
+                      index += 1
+                      continue
+                  severity_prefix = start.group(1)
+                  fragments = [line.strip()]
+                  match = diagnostic.fullmatch(" ".join(fragments))
+                  lookahead = index + 1
+                  while not match and lookahead < len(lines) and lookahead <= index + 40:
+                      continuation = ansi.sub("", lines[lookahead])
+                      if re.match(r"^\s*(error|warning|info)\s+•", continuation):
+                          break
+                      fragments.append(continuation.strip())
+                      match = diagnostic.fullmatch(" ".join(fragments))
+                      lookahead += 1
+                  index += 1
+                  was_unmatched = not match
+                  if not match:
+                      severity = severity_prefix
+                      safe_text = " ".join(fragments)
+                      location_matches = list(location_only.finditer(safe_text))
+                      location_match = location_matches[-1] if location_matches else None
+                      file_name = location_match.group(1) if location_match else ""
+                      line_number = location_match.group(2) if location_match else "0"
+                      code = location_match.group(3) if location_match and location_match.group(3) else "unknown"
+                  else:
+                      severity, file_name, line_number, code = match.groups()
+                  repository_file = safe_repository_file(file_name, repo_root) if file_name else None
+                  safe_code = code if re.fullmatch(r"[A-Za-z0-9_]+", code) else "unknown"
+                  if repository_file is None:
+                      placeholders += 1
+                      found.append({
+                          "severity": severity,
+                          "code": safe_code,
+                          "file": "unknown",
+                          "line": 0,
+                          "private_entry": private_normalized_entry(fragments),
+                      })
+                      continue
+                  if was_unmatched and (safe_code == "unknown" or line_number == "0"):
+                      placeholders += 1
+                  item = {
+                      "severity": severity,
+                      "code": safe_code,
+                      "file": repository_file,
+                      "line": int(line_number),
+                  }
+                  if safe_code == "unknown" or line_number == "0":
+                      item["private_entry"] = private_normalized_entry(fragments)
+                  found.append(item)
+              return found, placeholders
+
+          workspace = pathlib.Path.cwd().resolve()
+          base, base_placeholders = read_diagnostics(base_path, workspace / "security-baseline")
+          head, head_placeholders = read_diagnostics(head_path, workspace)
+
+          def key(item):
+              # Ignore line shifts caused by the five removed log statements.
+              return item["severity"], item["code"], item["file"]
+
+          def fully_classified(item):
+              return item["code"] != "unknown" and item["file"] != "unknown" and item["line"] > 0
+
+          base_classified = [item for item in base if fully_classified(item)]
+          head_classified = [item for item in head if fully_classified(item)]
+          base_unclassified = [item for item in base if not fully_classified(item)]
+          head_unclassified = [item for item in head if not fully_classified(item)]
+          base_counts = collections.Counter(map(key, base_classified))
+          head_counts = collections.Counter(map(key, head_classified))
+          remaining_new = head_counts - base_counts
+          new_items = []
+          for item in head_classified:
+              item_key = key(item)
+              if remaining_new[item_key] > 0:
+                  new_items.append(item)
+                  remaining_new[item_key] -= 1
+
+          remaining_base = base_counts - head_counts
+          base_only_items = []
+          for item in base_classified:
+              item_key = key(item)
+              if remaining_base[item_key] > 0:
+                  base_only_items.append(item)
+                  remaining_base[item_key] -= 1
+          base_private_counts = collections.Counter(
+              item["private_entry"] for item in base_unclassified
+          )
+          head_private_counts = collections.Counter(
+              item["private_entry"] for item in head_unclassified
+          )
+          matched_private_count = sum((base_private_counts & head_private_counts).values())
+          new_private_count = sum((head_private_counts - base_private_counts).values())
+          base_only_private_count = sum((base_private_counts - head_private_counts).values())
+          with summary_path.open("a", encoding="utf-8") as summary:
+              summary.write("## Health-Scope targeted analyzer comparison\n\n")
+              summary.write(f"- Unchanged base analysis exit code: `{base_status}`\n")
+              summary.write(f"- Pull request head analysis exit code: `{head_status}`\n")
+              summary.write(
+                  "- Diagnostics are matched by severity, code, and repository-relative file; "
+                  "line shifts are ignored when matching existing diagnostics.\n"
+              )
+              summary.write(
+                  "- Stale `test/widget_test.dart` is outside this focused validation; "
+                  "only the dedicated no-service security test is run.\n\n"
+              )
+              summary.write(
+                  "- Flutter 2.0.4 treats info-level findings as fatal by default; "
+                  "the analyzer's actual exit status is preserved.\n\n"
+              )
+              summary.write("### New diagnostics on the pull request head\n\n")
+              if new_items:
+                  summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
+                  for item in new_items:
+                      summary.write(
+                          f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
+                      )
+              if new_private_count:
+                  summary.write(
+                      f"Unclassified diagnostics with no base match: `{new_private_count}`; "
+                      "their identities and text are withheld.\n"
+                  )
+              if not new_items and not new_private_count:
+                  summary.write(
+                      "No new diagnostics were found by the classified and private-normalized comparisons.\n"
+                  )
+              summary.write("\n### All pull request head diagnostics\n\n")
+              if head:
+                  summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
+                  for item in head:
+                      summary.write(
+                          f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
+                      )
+              else:
+                  summary.write("No recognized diagnostics.\n")
+              summary.write("\n### Base-only diagnostics\n\n")
+              if base_only_items:
+                  summary.write("| Severity | Code | File | Line |\n|---|---|---|---:|\n")
+                  for item in base_only_items:
+                      summary.write(
+                          f"| {item['severity']} | `{item['code']}` | `{item['file']}` | {item['line']} |\n"
+                      )
+              else:
+                  summary.write("No fully classified base-only diagnostics matched these fields.\n")
+              if base_only_private_count:
+                  summary.write(
+                      f"Unclassified diagnostics present only on the unchanged base: "
+                      f"`{base_only_private_count}`; their identities and text are withheld.\n"
+                  )
+              base_unknown_severity = collections.Counter(
+                  item["severity"] for item in base if not fully_classified(item)
+              )
+              head_unknown_severity = collections.Counter(
+                  item["severity"] for item in head if not fully_classified(item)
+              )
+              if base_placeholders or head_placeholders:
+                  def format_severity_counts(values):
+                      return ", ".join(
+                          f"{severity}={values[severity]}"
+                          for severity in ("error", "warning", "info")
+                          if values[severity]
+                      ) or "none"
+                  summary.write(
+                      "\nUnclassified entries are compared privately after line/column normalization; "
+                      "their identities and raw text are withheld. Counts by severity are "
+                      f"(base: {format_severity_counts(base_unknown_severity)}; "
+                      f"pull request head: {format_severity_counts(head_unknown_severity)}). "
+                      f"Private comparison: matched={matched_private_count}, "
+                      f"head-only={new_private_count}, base-only={base_only_private_count}.\n"
+                  )
+              summary.write(
+                  "\nOnly severity, diagnostic code, repository-relative file, and line are shown. "
+                  "Raw analyzer output and source snippets are withheld.\n"
+              )
+          PY
+          exit "$head_status"
+
+      - name: Run focused no-service security tests
+        if: ${{ always() && steps.flutter_setup.outcome == 'success' && steps.pub_get.outcome == 'success' }}
+        run: flutter test test/health_scope_sensitive_log_test.dart

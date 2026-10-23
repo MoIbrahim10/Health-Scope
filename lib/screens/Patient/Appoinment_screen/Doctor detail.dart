@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 // import 'package:healthscopeapplication/components/Patient _bottom_nav_bar.dart';
 // import 'package:healthscopeapplication/enums.dart';
-import 'package:healthscope/screens/Patient/Appoinment_screen/body.dart';
 
 class DoctorDetail extends StatelessWidget {
   // static String routeName = "/DoctorDetail";
@@ -170,12 +169,14 @@ class DoctorDetail extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 height: 55.0,
-                child: RaisedButton(
+                child: ElevatedButton(
                   onPressed: () {},
-                  elevation: 0.0,
-                  color: Color(0XFFEB1555),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25.0),
+                  style: ElevatedButton.styleFrom(
+                    primary: Color(0XFFEB1555),
+                    elevation: 0.0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25.0),
+                    ),
                   ),
                   child: Center(
                     child: Text(

@@ -16,7 +16,7 @@ class Appoinment extends StatelessWidget {
       ),
       body: Body(),
       bottomNavigationBar:
-          PatientBottomNavBar(PselectedMenu: MenuState.patientAppointment),
+          PatientBottomNavBar(selectedMenu: MenuState.patientAppointment),
     );
   }
 }
